@@ -18,12 +18,15 @@ interface CreateGoalModalProps {
 }
 
 export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalModalProps) => {
-  const { publicKey, wallet } = useWallet(); // Added wallet here
+  // Get wallet adapter methods
+  const { publicKey, signTransaction, signAllTransactions } = useWallet();
+  
   console.log("🔍 Wallet state:", {
     publicKey: publicKey?.toString(),
-    wallet: wallet?.adapter?.name,
-    connected: !!wallet,
+    hasSignTransaction: !!signTransaction,
+    hasSignAllTransactions: !!signAllTransactions,
   });
+  
   const { toast } = useToast();
   const [creating, setCreating] = useState(false);
 
@@ -40,7 +43,8 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!publicKey || !wallet) {
+    // Check if wallet is connected
+    if (!publicKey || !signTransaction || !signAllTransactions) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet first',
@@ -49,6 +53,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
       return;
     }
 
+    // Validate amount
     if (formData.amountSol < 0.1) {
       toast({
         title: 'Invalid amount',
@@ -73,11 +78,18 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
       
       console.log('🚀 Creating goal with data:', { ...formData, deadline: deadlineISO });
       
-      // Pass wallet object, not just publicKey string
+      // Create wallet adapter object with proper structure
+      const walletAdapter = {
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      };
+      
+      // Call API with proper wallet adapter
       await mockApi.createGoal(
         { ...formData, deadline: deadlineISO },
         publicKey.toString(),
-        wallet // Pass the wallet adapter object
+        walletAdapter
       );
       
       toast({
@@ -126,6 +138,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Label htmlFor="title">Goal Title *</Label>
             <Input
               id="title"
+              name="title"
               placeholder="e.g., Complete 30-day fitness challenge"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -140,6 +153,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Label htmlFor="description">Description *</Label>
             <Textarea
               id="description"
+              name="description"
               placeholder="Describe your goal in detail..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -155,6 +169,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Label htmlFor="amount">Lock Amount (SOL) *</Label>
             <Input
               id="amount"
+              name="amount"
               type="number"
               step="0.1"
               min="0.1"
@@ -171,6 +186,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Label htmlFor="deadline">Deadline *</Label>
             <Input
               id="deadline"
+              name="deadline"
               type="date"
               value={formData.deadline}
               onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}

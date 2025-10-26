@@ -131,6 +131,7 @@ export class BullseyeClient {
 
   /**
    * Get a specific goal by user's wallet address
+   * FIXED: Now uses fetchNullable to handle non-existent accounts gracefully
    */
   async getGoal(userWallet: string): Promise<Goal | null> {
     try {
@@ -147,18 +148,27 @@ export class BullseyeClient {
 
       const program = await this.initializeProgram(dummyWallet);
 
-      // Fetch accounts
-      const goalAccount = (await program.account.goal.fetch(
-        goalPda
-      )) as unknown as GoalAccount;
-      const verificationAccount = (await program.account.verification.fetch(
+      // Fetch accounts - use fetchNullable to handle non-existent accounts
+      const goalAccount = await program.account.goal.fetchNullable(goalPda);
+      
+      if (!goalAccount) {
+        console.log(`ℹ️ No goal found for wallet: ${userWallet}`);
+        return null;
+      }
+
+      const verificationAccount = await program.account.verification.fetchNullable(
         verificationPda
-      )) as unknown as VerificationAccount;
+      );
+
+      if (!verificationAccount) {
+        console.log(`⚠️ Goal exists but verification account missing for: ${userWallet}`);
+        return null;
+      }
 
       // Convert to frontend format
       const goal = convertGoalAccountToGoal(
-        goalAccount,
-        verificationAccount,
+        goalAccount as unknown as GoalAccount,
+        verificationAccount as unknown as VerificationAccount,
         goalPda
       );
 
@@ -195,13 +205,19 @@ export class BullseyeClient {
           const goalAccount = accountInfo.account as unknown as GoalAccount;
           const [verificationPda] = deriveVerificationPda(goalPda);
 
-          const verificationAccount = (await program.account.verification.fetch(
+          // Use fetchNullable here too for safety
+          const verificationAccount = await program.account.verification.fetchNullable(
             verificationPda
-          )) as unknown as VerificationAccount;
+          );
+
+          if (!verificationAccount) {
+            console.log(`⚠️ Skipping goal ${goalPda.toBase58()} - missing verification account`);
+            continue;
+          }
 
           const goal = convertGoalAccountToGoal(
             goalAccount,
-            verificationAccount,
+            verificationAccount as unknown as VerificationAccount,
             goalPda
           );
           goals.push(goal);

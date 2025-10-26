@@ -17,7 +17,8 @@ interface GoalCardProps {
 }
 
 export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardProps) => {
-  const { publicKey, wallet } = useWallet();
+  // Get wallet adapter methods (not the wrapper)
+  const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { toast } = useToast();
   const [claiming, setClaiming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +47,7 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
   const canSubmit = goal.status === 'active';
 
   const handleSubmitForVerification = async () => {
-    if (!wallet || !publicKey) {
+    if (!publicKey || !signTransaction || !signAllTransactions) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet',
@@ -59,7 +60,14 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
       setSubmitting(true);
       console.log('📤 Submitting for verification...', goal.user);
       
-      await mockApi.requestVerification(goal.id, goal.user, wallet);
+      // Create proper wallet adapter object
+      const walletAdapter = {
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      };
+      
+      await mockApi.requestVerification(goal.id, goal.user, walletAdapter);
       
       toast({
         title: 'Submitted for verification! ✨',
@@ -80,7 +88,7 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
   };
 
   const handleClaim = async () => {
-    if (!wallet || !publicKey) {
+    if (!publicKey || !signTransaction || !signAllTransactions) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet',
@@ -93,7 +101,14 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
       setClaiming(true);
       console.log('💰 Claiming funds...', goal.user);
       
-      const result = await mockApi.claimFunds(goal.id, goal.user, wallet);
+      // Create proper wallet adapter object
+      const walletAdapter = {
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      };
+      
+      const result = await mockApi.claimFunds(goal.id, goal.user, walletAdapter);
       
       toast({
         title: result.success ? 'Success! 🎉' : 'Goal Failed 😢',

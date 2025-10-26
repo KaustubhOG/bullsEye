@@ -4,7 +4,6 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ThumbsUp, ThumbsDown, Coins } from 'lucide-react';
 import { mockApi } from '@/lib/mockApi';
@@ -17,7 +16,8 @@ interface DemoControlsProps {
 }
 
 export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps) => {
-  const { publicKey, wallet } = useWallet();
+  // Get wallet adapter methods (not the wrapper)
+  const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { toast } = useToast();
   const [verifierIndex, setVerifierIndex] = useState(0);
   const [voteType, setVoteType] = useState<'yes' | 'no'>('yes');
@@ -68,7 +68,7 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
       return;
     }
 
-    if (!wallet) {
+    if (!publicKey || !signTransaction || !signAllTransactions) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet',
@@ -83,14 +83,21 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
       
       const verifierAddress = VERIFIERS[verifierIndex].toBase58();
       
+      // Create proper wallet adapter object
+      const walletAdapter = {
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      };
+      
       // Note: In production, you'd need the actual verifier's wallet
       // For testing, we're using the connected wallet to simulate
       const result = await mockApi.vote(
         activeGoalId,
         verifierAddress,
         voteType,
-        publicKey!.toString(), // Goal owner's wallet
-        wallet // Connected wallet acting as verifier
+        publicKey.toString(), // Goal owner's wallet
+        walletAdapter // Connected wallet acting as verifier
       );
       
       toast({
@@ -122,7 +129,7 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
             <span className="text-xs font-normal text-muted-foreground">(Testing Tools)</span>
           </h4>
           <p className="text-xs text-muted-foreground">
-            Tools for testing on localnet
+            Tools for testing on devnet
           </p>
         </div>
 
@@ -140,12 +147,20 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
             {airdropping ? 'Airdropping...' : 'Airdrop 2 SOL'}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Get free SOL for testing (localnet only)
+            Get free SOL for testing (devnet only)
           </p>
         </div>
 
         <div className="border-t border-border pt-3 space-y-3">
           <Label className="text-xs font-semibold">🗳️ Simulate Verification</Label>
+          
+          {/* Warning Badge */}
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs text-yellow-600">
+            <p className="font-semibold">⚠️ Testing Mode</p>
+            <p className="text-[10px] mt-0.5">
+              Your wallet is simulating verifier votes. In production, actual verifiers will vote via Blinks.
+            </p>
+          </div>
           
           {/* Verifier Selection */}
           <div className="space-y-2">
@@ -194,7 +209,7 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
 
           <Button
             onClick={handleSimulateVote}
-            disabled={!activeGoalId || voting || !wallet}
+            disabled={!activeGoalId || voting || !publicKey}
             size="sm"
             className="w-full"
             variant="secondary"
