@@ -9,7 +9,7 @@ import { PublicKey, clusterApiUrl, Connection } from '@solana/web3.js';
  */
 export type NetworkType = 'localnet' | 'devnet' | 'mainnet-beta';
 
-export const NETWORK: NetworkType = 'localnet'; // Start with localnet for testing
+export const NETWORK: NetworkType = 'devnet'; // Start with localnet for testing
 
 /**
  * RPC Endpoint based on network

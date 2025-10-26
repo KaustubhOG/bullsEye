@@ -19,6 +19,11 @@ interface CreateGoalModalProps {
 
 export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalModalProps) => {
   const { publicKey, wallet } = useWallet(); // Added wallet here
+  console.log("🔍 Wallet state:", {
+    publicKey: publicKey?.toString(),
+    wallet: wallet?.adapter?.name,
+    connected: !!wallet,
+  });
   const { toast } = useToast();
   const [creating, setCreating] = useState(false);
 

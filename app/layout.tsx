@@ -4,6 +4,7 @@ import "./globals.css";
 import "@solana/wallet-adapter-react-ui/styles.css"; // Import CSS here
 import { WalletProviders } from "./WalletProviders";
 import { Toaster } from "@/components/ui/toaster";
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

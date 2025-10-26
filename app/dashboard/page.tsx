@@ -11,6 +11,7 @@ import { DemoControls } from "@/components/DemoControls";
 import { Goal, FeedItem } from "@/types/goal";
 import { mockApi } from "@/lib/mockApi";
 
+
 export default function DashboardPage() {
   const { publicKey, connected } = useWallet();
   const [goals, setGoals] = useState<Goal[]>([]);

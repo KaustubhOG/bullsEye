@@ -19,14 +19,14 @@ export const ProfileCard = ({
   onCreateGoal,
   onViewHistory,
 }: ProfileCardProps) => {
-  const { publicKey, connected } = useWallet();
+  const wallet = useWallet(); // ✅ Get full wallet object
   const [mounted, setMounted] = useState(false);
 
-  // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // ✅ Show loading state until mounted
   if (!mounted) {
     return (
       <Card className="p-6 shadow-lg border-border/50">
@@ -41,6 +41,9 @@ export const ProfileCard = ({
       </Card>
     );
   }
+
+  // ✅ Now access wallet properties
+  const { publicKey, connected } = wallet;
 
   return (
     <Card className="p-6 shadow-lg border-border/50">

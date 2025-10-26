@@ -9,7 +9,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   // Use localhost for local testing
-  const endpoint = useMemo(() => 'http://127.0.0.1:8899', []);
+  const endpoint = useMemo(() => 'https://api.devnet.solana.com', []);
   
   const wallets = useMemo(
     () => [
