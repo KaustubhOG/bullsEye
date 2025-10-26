@@ -9,7 +9,7 @@ import { PublicKey, clusterApiUrl, Connection } from '@solana/web3.js';
  */
 export type NetworkType = 'localnet' | 'devnet' | 'mainnet-beta';
 
-export const NETWORK: NetworkType = 'devnet'; // Start with localnet for testing
+export const NETWORK: NetworkType = 'devnet';
 
 /**
  * RPC Endpoint based on network
@@ -47,17 +47,18 @@ export const PROGRAM_ID = new PublicKey(
 );
 
 // ============================================================================
-// VERIFIERS
+// VERIFIERS (UPDATED)
 // ============================================================================
 
 /**
  * Three verifier addresses for goal verification
  * These are the only addresses that can vote on goal completions
+ * UPDATED: New verifier wallets (all controlled by you, but different addresses)
  */
 export const VERIFIERS = [
-  new PublicKey('AkGpT1xZG9KxQX7HMQTgNJwxCE7RQ2U44buF2d9drACw'),
-  new PublicKey('AALXwPLR86yQsh4Fe8c4UW4UdjVkQugfJXd5X3xee4Sr'),
   new PublicKey('Gi1kdfMhvLtjHLpLiWqQaM6AqveErQ8tXWdAanfEHSKH'),
+  new PublicKey('FprggnEn9tfKh3JcgUjDCeFbMUyErAfmyKTJWDB61BpS'),
+  new PublicKey('Bf5vWqozxKxNXgNem2P9KQCxqdB2Vfn11KLh5vSNH9yX'),
 ];
 
 /**

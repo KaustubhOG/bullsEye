@@ -4,8 +4,9 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ThumbsUp, ThumbsDown, Coins } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Coins, Info } from 'lucide-react';
 import { mockApi } from '@/lib/mockApi';
 import { useToast } from '@/hooks/use-toast';
 import { VERIFIERS } from '@/lib/solana/config';
@@ -16,9 +17,11 @@ interface DemoControlsProps {
 }
 
 export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps) => {
-  // Get wallet adapter methods (not the wrapper)
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { toast } = useToast();
+  
+  // State for voting
+  const [goalOwnerWallet, setGoalOwnerWallet] = useState('');
   const [verifierIndex, setVerifierIndex] = useState(0);
   const [voteType, setVoteType] = useState<'yes' | 'no'>('yes');
   const [voting, setVoting] = useState(false);
@@ -58,11 +61,14 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
     }
   };
 
-  const handleSimulateVote = async () => {
-    if (!activeGoalId) {
+  const handleVote = async () => {
+    // Use provided goal owner wallet or fall back to activeGoalId
+    const targetWallet = goalOwnerWallet.trim() || (activeGoalId ? activeGoalId : '');
+    
+    if (!targetWallet) {
       toast({
-        title: 'No active goal',
-        description: 'Create and submit a goal for verification first',
+        title: 'No goal specified',
+        description: 'Enter the wallet address of the goal creator',
         variant: 'destructive',
       });
       return;
@@ -77,11 +83,27 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
       return;
     }
 
+    // Check if connected wallet is a verifier
+    const isConnectedVerifier = VERIFIERS.some(v => v.equals(publicKey));
+    if (!isConnectedVerifier) {
+      toast({
+        title: 'Not a verifier',
+        description: `Connected wallet (${publicKey.toBase58().slice(0, 8)}...) is not a registered verifier`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setVoting(true);
-      console.log('🗳️ Simulating vote...', { activeGoalId, verifierIndex, voteType });
+      console.log('🗳️ Casting vote...', { 
+        goalOwner: targetWallet, 
+        connectedWallet: publicKey.toBase58(),
+        voteType 
+      });
       
-      const verifierAddress = VERIFIERS[verifierIndex].toBase58();
+      // The verifier address comes from the CONNECTED wallet, not the dropdown
+      const verifierAddress = publicKey.toBase58();
       
       // Create proper wallet adapter object
       const walletAdapter = {
@@ -90,24 +112,25 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
         signAllTransactions,
       };
       
-      // Note: In production, you'd need the actual verifier's wallet
-      // For testing, we're using the connected wallet to simulate
       const result = await mockApi.vote(
-        activeGoalId,
+        'dummy-goal-id', // Not used in current implementation
         verifierAddress,
         voteType,
-        publicKey.toString(), // Goal owner's wallet
-        walletAdapter // Connected wallet acting as verifier
+        targetWallet, // Goal owner's wallet
+        walletAdapter
       );
       
       toast({
         title: `Vote ${voteType === 'yes' ? 'Approved' : 'Rejected'}! ✅`,
         description: result.verified 
-          ? 'Goal is now verified! You can claim funds.'
-          : `Vote recorded. Need ${2 - result.votes.filter(v => v.vote === 'yes').length} more YES votes.`,
+          ? 'Goal is now verified! Goal owner can claim funds.'
+          : `Vote recorded. Current: ${result.votes.filter(v => v.vote === 'yes').length} YES, ${result.votes.filter(v => v.vote === 'no').length} NO votes.`,
       });
       
       onVoteSuccess();
+      
+      // Clear input after successful vote
+      setGoalOwnerWallet('');
     } catch (error: any) {
       console.error('❌ Vote failed:', error);
       toast({
@@ -119,6 +142,9 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
       setVoting(false);
     }
   };
+
+  // Check if connected wallet is a verifier
+  const connectedIsVerifier = publicKey && VERIFIERS.some(v => v.equals(publicKey));
 
   return (
     <Card className="p-4 bg-muted/30 border-dashed">
@@ -152,36 +178,39 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
         </div>
 
         <div className="border-t border-border pt-3 space-y-3">
-          <Label className="text-xs font-semibold">🗳️ Simulate Verification</Label>
+          <Label className="text-xs font-semibold">🗳️ Cast Vote as Verifier</Label>
           
-          {/* Warning Badge */}
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs text-yellow-600">
-            <p className="font-semibold">⚠️ Testing Mode</p>
-            <p className="text-[10px] mt-0.5">
-              Your wallet is simulating verifier votes. In production, actual verifiers will vote via Blinks.
-            </p>
-          </div>
+          {/* Connected Wallet Info */}
+          {publicKey && (
+            <div className={`rounded p-2 text-xs ${connectedIsVerifier ? 'bg-green-500/10 border border-green-500/20 text-green-600' : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-600'}`}>
+              <p className="font-semibold flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                {connectedIsVerifier ? '✅ You are a verifier' : '⚠️ Not a verifier wallet'}
+              </p>
+              <p className="text-[10px] mt-0.5 font-mono">
+                {publicKey.toBase58().slice(0, 12)}...{publicKey.toBase58().slice(-8)}
+              </p>
+            </div>
+          )}
           
-          {/* Verifier Selection */}
+          {/* Goal Owner Wallet Input */}
           <div className="space-y-2">
-            <Label className="text-xs">Select Verifier</Label>
-            <RadioGroup
-              value={verifierIndex.toString()}
-              onValueChange={(value) => setVerifierIndex(parseInt(value))}
-              className="space-y-1"
-            >
-              {VERIFIERS.map((verifier, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <RadioGroupItem value={index.toString()} id={`verifier-${index}`} />
-                  <Label 
-                    htmlFor={`verifier-${index}`} 
-                    className="text-xs cursor-pointer font-mono"
-                  >
-                    Verifier {index + 1}: {verifier.toBase58().slice(0, 8)}...
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
+            <Label htmlFor="goal-owner" className="text-xs">
+              Goal Owner Wallet Address
+            </Label>
+            <Input
+              id="goal-owner"
+              name="goal-owner"
+              placeholder="Enter wallet address that created the goal"
+              value={goalOwnerWallet}
+              onChange={(e) => setGoalOwnerWallet(e.target.value)}
+              className="text-xs font-mono"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {activeGoalId 
+                ? `Or leave empty to vote on your own goal (${activeGoalId.slice(0, 8)}...)`
+                : 'Paste the wallet address of the goal creator'}
+            </p>
           </div>
 
           {/* Vote Type */}
@@ -208,8 +237,8 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
           </div>
 
           <Button
-            onClick={handleSimulateVote}
-            disabled={!activeGoalId || voting || !publicKey}
+            onClick={handleVote}
+            disabled={voting || !publicKey || !connectedIsVerifier}
             size="sm"
             className="w-full"
             variant="secondary"
@@ -218,15 +247,32 @@ export const DemoControls = ({ activeGoalId, onVoteSuccess }: DemoControlsProps)
           </Button>
         </div>
 
-        {/* Info */}
-        <div className="bg-accent/10 rounded p-2 text-xs text-muted-foreground">
-          <p className="font-semibold text-accent mb-1">ℹ️ How to test:</p>
+        {/* Verifier List */}
+        <div className="bg-accent/10 rounded p-2 text-xs">
+          <p className="font-semibold text-accent mb-1">📋 Registered Verifiers:</p>
+          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground">
+            {VERIFIERS.map((v, i) => (
+              <p key={i}>
+                {i + 1}. {v.toBase58().slice(0, 8)}...{v.toBase58().slice(-4)}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="bg-blue-500/10 rounded p-2 text-xs text-muted-foreground">
+          <p className="font-semibold text-blue-400 mb-1">ℹ️ How to vote:</p>
           <ol className="space-y-0.5 text-[10px] ml-3">
-            <li>1. Airdrop SOL to your wallet</li>
-            <li>2. Create a goal</li>
-            <li>3. Submit for verification</li>
-            <li>4. Cast 2 YES votes to verify</li>
-            <li>5. Claim your funds!</li>
+            <li>1. Create a goal with Wallet A</li>
+            <li>2. Submit goal for verification</li>
+            <li>3. Copy Wallet A's address</li>
+            <li>4. Switch to Verifier Wallet 1</li>
+            <li>5. Paste Wallet A's address here</li>
+            <li>6. Cast YES vote</li>
+            <li>7. Switch to Verifier Wallet 2</li>
+            <li>8. Paste Wallet A's address again</li>
+            <li>9. Cast YES vote → Verified! ✅</li>
+            <li>10. Switch back to Wallet A and claim!</li>
           </ol>
         </div>
       </div>
