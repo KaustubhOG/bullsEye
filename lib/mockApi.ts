@@ -1,40 +1,11 @@
-import { Goal, CreateGoalData, Vote, FeedItem } from '@/types/goal';
+import { getBullseyeClient } from './solana/bullseye-client';
+import type { Goal, CreateGoalData, Vote, FeedItem } from '@/types/goal';
+import { VERIFIERS } from './solana/config';
 
-// Mock data store
-let mockGoals: Goal[] = [
-  {
-    id: '1',
-    title: 'Complete 30-day fitness challenge',
-    description: 'Workout 5 days a week for the next month',
-    amountSol: 0.5,
-    deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    verificationType: 'strangers',
-    failDestination: 'burn',
-    status: 'active',
-    votes: [
-      { wallet: '4xQw...7pZk', vote: 'yes', timestamp: new Date().toISOString() }
-    ],
-    requiredVotes: 3,
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    ownerWallet: 'demo-wallet',
-  },
-  {
-    id: '2',
-    title: 'Launch side project MVP',
-    description: 'Build and deploy a working prototype by end of month',
-    amountSol: 1.0,
-    deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-    verificationType: 'friend',
-    verifierWallet: 'HJ3g...9mKp',
-    failDestination: 'company',
-    status: 'pending',
-    votes: [],
-    requiredVotes: 1,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    ownerWallet: 'demo-wallet',
-  },
-];
+// Get the singleton client
+const client = getBullseyeClient();
 
+// In-memory feed for now (we'll enhance this later)
 let mockFeed: FeedItem[] = [
   {
     id: 'f1',
@@ -54,168 +25,257 @@ let mockFeed: FeedItem[] = [
     timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     goalId: '124',
   },
-  {
-    id: 'f3',
-    type: 'goal_failed',
-    username: 'charlie.dev',
-    avatar: '🔥',
-    message: 'failed "Daily meditation" - 0.2 SOL sent to burn wallet',
-    timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    goalId: '125',
-  },
-  {
-    id: 'f4',
-    type: 'verification_requested',
-    username: 'diana.sol',
-    avatar: '✨',
-    message: 'requested verification for "Morning runs challenge"',
-    timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    goalId: '126',
-  },
-  {
-    id: 'f5',
-    type: 'goal_completed',
-    username: 'eve.eth',
-    avatar: '💎',
-    message: 'successfully completed "Code every day" and claimed 0.8 SOL!',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    goalId: '127',
-  },
 ];
 
-// Simulated API delay
+// Simulated API delay for UX
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const mockApi = {
-  async createGoal(data: CreateGoalData, ownerWallet: string): Promise<Goal> {
-    await delay(500);
-    
-    const newGoal: Goal = {
-      id: `goal-${Date.now()}`,
-      ...data,
-      status: 'pending',
-      votes: [],
-      requiredVotes: data.verificationType === 'friend' ? 1 : 3,
-      createdAt: new Date().toISOString(),
-      ownerWallet,
-    };
-    
-    mockGoals.push(newGoal);
-    
-    // Add to feed
-    mockFeed.unshift({
-      id: `feed-${Date.now()}`,
-      type: 'goal_created',
-      username: 'You',
-      avatar: '🎯',
-      message: `committed ${data.amountSol} SOL to "${data.title}"`,
-      timestamp: new Date().toISOString(),
-      goalId: newGoal.id,
-    });
-    
-    return newGoal;
-  },
-
-  async getGoals(wallet?: string): Promise<Goal[]> {
+  /**
+   * Create a new goal on blockchain
+   */
+  async createGoal(data: CreateGoalData, ownerWallet: string, wallet: any): Promise<Goal> {
     await delay(300);
-    return wallet 
-      ? mockGoals.filter(g => g.ownerWallet === wallet)
-      : mockGoals;
+    
+    try {
+      console.log('🚀 Creating goal on blockchain...', data);
+      
+      const { goal, signature } = await client.createGoal(data, wallet);
+      
+      console.log('✅ Goal created on blockchain!', { goal, signature });
+      
+      // Add to feed
+      mockFeed.unshift({
+        id: `feed-${Date.now()}`,
+        type: 'goal_created',
+        username: 'You',
+        avatar: '🎯',
+        message: `committed ${data.amountSol} SOL to "${data.title}"`,
+        timestamp: new Date().toISOString(),
+        goalId: goal.id,
+      });
+      
+      return goal;
+    } catch (error) {
+      console.error('❌ Error creating goal:', error);
+      throw error;
+    }
   },
 
-  async getGoal(id: string): Promise<Goal | null> {
+  /**
+   * Get all goals for a specific wallet (or all goals if no wallet specified)
+   */
+  async getGoals(wallet?: string): Promise<Goal[]> {
     await delay(200);
-    return mockGoals.find(g => g.id === id) || null;
+    
+    try {
+      console.log('📊 Fetching goals from blockchain...', wallet);
+      
+      if (wallet) {
+        // Fetch specific user's goal
+        const goal = await client.getGoal(wallet);
+        return goal ? [goal] : [];
+      } else {
+        // Fetch all goals
+        const goals = await client.getAllGoals();
+        console.log('✅ Fetched goals:', goals.length);
+        return goals;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching goals:', error);
+      return [];
+    }
   },
 
-  async requestVerification(goalId: string): Promise<{ blinkLinks: { verifier: string; link: string }[] }> {
-    await delay(500);
+  /**
+   * Get a single goal by user wallet
+   */
+  async getGoal(userWallet: string): Promise<Goal | null> {
+    await delay(100);
     
-    const goal = mockGoals.find(g => g.id === goalId);
-    if (!goal) throw new Error('Goal not found');
-    
-    const blinkLinks = goal.verificationType === 'friend'
-      ? [{ 
-          verifier: goal.verifierWallet || 'friend',
-          link: `https://blink.example/act?goal=${goalId}&type=verify&v=${goal.verifierWallet}`
-        }]
-      : [
-          { verifier: 'stranger-1', link: `https://blink.example/act?goal=${goalId}&type=verify&v=1` },
-          { verifier: 'stranger-2', link: `https://blink.example/act?goal=${goalId}&type=verify&v=2` },
-          { verifier: 'stranger-3', link: `https://blink.example/act?goal=${goalId}&type=verify&v=3` },
-        ];
-    
-    goal.blinkLinks = blinkLinks;
-    goal.status = 'active';
-    
-    // Add to feed
-    mockFeed.unshift({
-      id: `feed-${Date.now()}`,
-      type: 'verification_requested',
-      username: 'You',
-      avatar: '✨',
-      message: `requested verification for "${goal.title}"`,
-      timestamp: new Date().toISOString(),
-      goalId: goal.id,
-    });
-    
-    return { blinkLinks };
+    try {
+      console.log('📊 Fetching goal from blockchain...', userWallet);
+      const goal = await client.getGoal(userWallet);
+      return goal;
+    } catch (error) {
+      console.error('❌ Error fetching goal:', error);
+      return null;
+    }
   },
 
-  async vote(goalId: string, verifierWallet: string, vote: 'yes' | 'no'): Promise<{ votes: Vote[]; verified: boolean }> {
+  /**
+   * Submit goal for verification
+   */
+  async requestVerification(goalId: string, userWallet: string, wallet: any): Promise<{ blinkLinks: { verifier: string; link: string }[] }> {
+    await delay(300);
+    
+    try {
+      console.log('🔔 Submitting for verification...', { goalId, userWallet });
+      
+      const { signature, verificationDeadline } = await client.submitForVerification(
+        userWallet,
+        wallet
+      );
+      
+      console.log('✅ Submitted for verification!', { signature, verificationDeadline });
+      
+      // Generate blink links for verifiers
+      const blinkLinks = VERIFIERS.map((verifier, index) => ({
+        verifier: verifier.toBase58(),
+        link: `${window.location.origin}/verify?goal=${goalId}&verifier=${index}`
+      }));
+      
+      // Add to feed
+      const goal = await client.getGoal(userWallet);
+      if (goal) {
+        mockFeed.unshift({
+          id: `feed-${Date.now()}`,
+          type: 'verification_requested',
+          username: 'You',
+          avatar: '✨',
+          message: `requested verification for "${goal.title}"`,
+          timestamp: new Date().toISOString(),
+          goalId: goal.id,
+        });
+      }
+      
+      return { blinkLinks };
+    } catch (error) {
+      console.error('❌ Error requesting verification:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cast vote (verifiers only)
+   */
+  async vote(
+    goalId: string, 
+    verifierWallet: string, 
+    vote: 'yes' | 'no',
+    userWallet: string,
+    wallet: any
+  ): Promise<{ votes: Vote[]; verified: boolean }> {
+    await delay(300);
+    
+    try {
+      console.log('🗳️ Casting vote...', { goalId, verifierWallet, vote });
+      
+      const voteBoolean = vote === 'yes';
+      const result = await client.castVote(userWallet, voteBoolean, wallet);
+      
+      console.log('✅ Vote cast!', result);
+      
+      // Fetch updated goal
+      const goal = await client.getGoal(userWallet);
+      if (!goal) {
+        throw new Error('Goal not found after voting');
+      }
+      
+      const verified = result.finalized && result.yesVotes >= 2;
+      
+      return {
+        votes: goal.votes,
+        verified
+      };
+    } catch (error) {
+      console.error('❌ Error casting vote:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Claim funds after successful verification
+   */
+  async claimFunds(goalId: string, userWallet: string, wallet: any): Promise<{ txSig: string; success: boolean }> {
     await delay(400);
     
-    const goal = mockGoals.find(g => g.id === goalId);
-    if (!goal) throw new Error('Goal not found');
-    
-    // Remove existing vote from this verifier if any
-    goal.votes = goal.votes.filter(v => v.wallet !== verifierWallet);
-    
-    // Add new vote
-    goal.votes.push({
-      wallet: verifierWallet,
-      vote,
-      timestamp: new Date().toISOString(),
-    });
-    
-    const yesVotes = goal.votes.filter(v => v.vote === 'yes').length;
-    const verified = yesVotes >= goal.requiredVotes;
-    
-    if (verified) {
-      goal.status = 'verified';
+    try {
+      console.log('💰 Claiming funds...', { goalId, userWallet });
+      
+      const { signature, success } = await client.claimOrDistribute(userWallet, wallet);
+      
+      console.log('✅ Funds claimed/distributed!', { signature, success });
+      
+      // Add to feed
+      const goal = await client.getGoal(userWallet);
+      if (goal) {
+        mockFeed.unshift({
+          id: `feed-${Date.now()}`,
+          type: success ? 'goal_completed' : 'goal_failed',
+          username: 'You',
+          avatar: success ? '🎯' : '🔥',
+          message: success 
+            ? `successfully completed "${goal.title}" and claimed ${goal.amountSol} SOL!`
+            : `failed "${goal.title}" - ${goal.amountSol} SOL ${goal.failAction === 'burn' ? 'sent to burn wallet' : 'sent to company'}`,
+          timestamp: new Date().toISOString(),
+          goalId: goal.id,
+        });
+      }
+      
+      return {
+        txSig: signature,
+        success
+      };
+    } catch (error) {
+      console.error('❌ Error claiming funds:', error);
+      throw error;
     }
-    
-    return { votes: goal.votes, verified };
   },
 
-  async claimFunds(goalId: string): Promise<{ txSig: string; success: boolean }> {
-    await delay(600);
-    
-    const goal = mockGoals.find(g => g.id === goalId);
-    if (!goal) throw new Error('Goal not found');
-    if (goal.status !== 'verified') throw new Error('Goal not verified yet');
-    
-    goal.status = 'claimed';
-    
-    // Add to feed
-    mockFeed.unshift({
-      id: `feed-${Date.now()}`,
-      type: 'goal_completed',
-      username: 'You',
-      avatar: '🎯',
-      message: `successfully completed "${goal.title}" and claimed ${goal.amountSol} SOL!`,
-      timestamp: new Date().toISOString(),
-      goalId: goal.id,
-    });
-    
-    return {
-      txSig: `mock-tx-${Date.now()}`,
-      success: true,
-    };
-  },
-
+  /**
+   * Get social feed
+   */
   async getFeed(): Promise<FeedItem[]> {
-    await delay(200);
+    await delay(100);
     return mockFeed;
   },
+
+  // ============================================================================
+  // UTILITY FUNCTIONS (for testing/dev)
+  // ============================================================================
+
+  /**
+   * Request airdrop (localnet/devnet only)
+   */
+  async requestAirdrop(publicKey: string, amount: number = 1): Promise<string> {
+    try {
+      const { PublicKey } = await import('@solana/web3.js');
+      const pubkey = new PublicKey(publicKey);
+      const signature = await client.airdrop(pubkey, amount);
+      console.log('✅ Airdrop successful!', signature);
+      return signature;
+    } catch (error) {
+      console.error('❌ Airdrop failed:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get wallet balance
+   */
+  async getBalance(publicKey: string): Promise<number> {
+    try {
+      const { PublicKey } = await import('@solana/web3.js');
+      const pubkey = new PublicKey(publicKey);
+      const balance = await client.getBalance(pubkey);
+      return balance;
+    } catch (error) {
+      console.error('❌ Error fetching balance:', error);
+      return 0;
+    }
+  },
+
+  /**
+   * Check if wallet is a verifier
+   */
+  isVerifier(publicKey: string): boolean {
+    try {
+      const { PublicKey } = require('@solana/web3.js');
+      const pubkey = new PublicKey(publicKey);
+      return client.isVerifier(pubkey);
+    } catch (error) {
+      return false;
+    }
+  }
 };

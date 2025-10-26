@@ -1,11 +1,11 @@
 "use client";
-import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { Goal } from '@/types/goal';
-import { copyToClipboard, shareOnTwitter } from '@/lib/blink';
+import { useState } from 'react';
+import { VERIFIERS } from '@/lib/solana/config';
 
 interface VerificationModalProps {
   open: boolean;
@@ -16,30 +16,25 @@ interface VerificationModalProps {
 export const VerificationModal = ({ open, onOpenChange, goal }: VerificationModalProps) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  if (!goal || !goal.blinkLinks) return null;
+  if (!goal) return null;
 
-  const handleCopy = async (link: string, index: number) => {
-    const success = await copyToClipboard(link);
-    if (success) {
+  const handleCopy = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
     }
-  };
-
-  const handleShare = (link: string) => {
-    shareOnTwitter(
-      `Help me verify my goal: "${goal.title}" 🎯`,
-      link
-    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Verification Links Ready! ✨</DialogTitle>
+          <DialogTitle className="text-2xl">Goal Submitted for Verification! ✨</DialogTitle>
           <DialogDescription>
-            Share these Blink links with your verifiers. They can click to vote on your completion.
+            Your goal has been submitted to the blockchain. Verifiers can now vote on your completion.
           </DialogDescription>
         </DialogHeader>
 
@@ -50,75 +45,79 @@ export const VerificationModal = ({ open, onOpenChange, goal }: VerificationModa
             <p className="text-sm text-muted-foreground mb-3">{goal.description}</p>
             <div className="flex items-center gap-2">
               <Badge variant="outline">{goal.amountSol} SOL locked</Badge>
-              <Badge variant="outline">
-                {goal.requiredVotes} {goal.requiredVotes === 1 ? 'vote' : 'votes'} needed
+              <Badge variant="outline">Need 2 YES votes</Badge>
+              <Badge className="bg-purple-500/20 text-purple-500">
+                {goal.status.toUpperCase()}
               </Badge>
             </div>
           </div>
 
-          {/* Blink Links */}
+          {/* Verifiers Info */}
           <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Verification Blinks:</h4>
-            {goal.blinkLinks.map((blink, index) => (
+            <h4 className="font-semibold text-sm">📋 Registered Verifiers:</h4>
+            {VERIFIERS.map((verifier, index) => (
               <div
                 key={index}
                 className="border border-border rounded-lg p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {goal.verificationType === 'friend' ? 'Friend Verifier' : `Verifier ${index + 1}`}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {blink.verifier}
+                  <span className="text-sm font-medium">Verifier {index + 1}</span>
+                  <Badge variant="outline" className="text-xs font-mono">
+                    {verifier.toBase58().slice(0, 8)}...{verifier.toBase58().slice(-4)}
                   </Badge>
                 </div>
 
                 <div className="bg-muted/50 rounded p-3 font-mono text-xs break-all">
-                  {blink.link}
+                  {verifier.toBase58()}
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopy(blink.link, index)}
-                    className="flex-1"
-                  >
-                    {copiedIndex === index ? (
-                      <>
-                        <Check className="w-3 h-3 mr-1" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3 mr-1" />
-                        Copy Link
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleShare(blink.link)}
-                    className="flex-1"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Share on X
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopy(verifier.toBase58(), index)}
+                  className="w-full"
+                >
+                  {copiedIndex === index ? (
+                    <>
+                      <Check className="w-3 h-3 mr-1" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy Address
+                    </>
+                  )}
+                </Button>
               </div>
             ))}
           </div>
 
-          {/* Info */}
-          <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 text-sm">
-            <p className="text-accent font-semibold mb-1">📬 What happens next?</p>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>• Share these links with your verifiers</li>
-              <li>• They'll click and vote on whether you completed your goal</li>
-              <li>• Once you get {goal.requiredVotes} {goal.requiredVotes === 1 ? 'approval' : 'approvals'}, you can claim your funds!</li>
-            </ul>
-          </div>
+          {/* Current Status */}
+          {goal.yesVotes > 0 || goal.noVotes > 0 ? (
+            <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 text-sm">
+              <p className="text-accent font-semibold mb-2">🗳️ Voting Progress:</p>
+              <div className="space-y-1 text-muted-foreground">
+                <p>✅ YES votes: {goal.yesVotes} / 2</p>
+                <p>❌ NO votes: {goal.noVotes} / 2</p>
+                {goal.finalized && (
+                  <p className="font-semibold text-accent mt-2">
+                    {goal.yesVotes >= 2 ? '✅ Verification complete!' : '❌ Verification failed'}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 text-sm">
+              <p className="text-accent font-semibold mb-1">📬 What happens next?</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• These verifiers can now vote on your goal</li>
+                <li>• Once you get 2 YES votes, you can claim your funds!</li>
+                <li>• If you get 2 NO votes, the goal fails</li>
+                <li>• Use the Demo Controls to simulate votes for testing</li>
+              </ul>
+            </div>
+          )}
 
           <Button onClick={() => onOpenChange(false)} className="w-full">
             Done

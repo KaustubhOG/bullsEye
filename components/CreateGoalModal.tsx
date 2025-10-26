@@ -18,7 +18,7 @@ interface CreateGoalModalProps {
 }
 
 export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalModalProps) => {
-  const { publicKey } = useWallet();
+  const { publicKey, wallet } = useWallet(); // Added wallet here
   const { toast } = useToast();
   const [creating, setCreating] = useState(false);
 
@@ -35,7 +35,7 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!publicKey) {
+    if (!publicKey || !wallet) {
       toast({
         title: 'Wallet not connected',
         description: 'Please connect your wallet first',
@@ -44,10 +44,19 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
       return;
     }
 
-    if (formData.amountSol <= 0) {
+    if (formData.amountSol < 0.1) {
       toast({
         title: 'Invalid amount',
-        description: 'Amount must be greater than 0',
+        description: 'Amount must be at least 0.1 SOL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.amountSol > 10) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Amount must be at most 10 SOL',
         variant: 'destructive',
       });
       return;
@@ -56,19 +65,25 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
     try {
       setCreating(true);
       const deadlineISO = new Date(formData.deadline).toISOString();
+      
+      console.log('🚀 Creating goal with data:', { ...formData, deadline: deadlineISO });
+      
+      // Pass wallet object, not just publicKey string
       await mockApi.createGoal(
         { ...formData, deadline: deadlineISO },
-        publicKey.toString()
+        publicKey.toString(),
+        wallet // Pass the wallet adapter object
       );
       
       toast({
         title: 'Goal Created! 🎯',
-        description: `Successfully locked ${formData.amountSol} SOL`,
+        description: `Successfully locked ${formData.amountSol} SOL on blockchain`,
       });
       
       onOpenChange(false);
       onSuccess();
       
+      // Reset form
       setFormData({
         title: '',
         description: '',
@@ -78,10 +93,11 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
         verifierWallet: '',
         failDestination: 'burn',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error creating goal:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create goal',
+        title: 'Failed to create goal',
+        description: error.message || 'Please try again',
         variant: 'destructive',
       });
     } finally {
@@ -109,7 +125,9 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               required
+              maxLength={100}
             />
+            <p className="text-xs text-muted-foreground">Max 100 characters</p>
           </div>
 
           {/* Description */}
@@ -122,7 +140,9 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               required
               rows={3}
+              maxLength={500}
             />
+            <p className="text-xs text-muted-foreground">Max 500 characters</p>
           </div>
 
           {/* Amount */}
@@ -131,13 +151,14 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Input
               id="amount"
               type="number"
-              step="0.01"
-              min="0.01"
+              step="0.1"
+              min="0.1"
+              max="10"
               value={formData.amountSol}
-              onChange={(e) => setFormData({ ...formData, amountSol: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, amountSol: parseFloat(e.target.value) || 0.1 })}
               required
             />
-            <p className="text-xs text-muted-foreground">Minimum 0.01 SOL</p>
+            <p className="text-xs text-muted-foreground">Between 0.1 and 10 SOL</p>
           </div>
 
           {/* Deadline */}
@@ -183,20 +204,6 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             </RadioGroup>
           </div>
 
-          {/* Verifier Wallet — Hidden */}
-          {false && (
-            <div className="space-y-2">
-              <Label htmlFor="verifier">Verifier Wallet Address *</Label>
-              <Input
-                id="verifier"
-                placeholder="Enter Solana wallet address"
-                value={formData.verifierWallet}
-                onChange={(e) => setFormData({ ...formData, verifierWallet: e.target.value })}
-                required
-              />
-            </div>
-          )}
-
           {/* Fail Destination */}
           <div className="space-y-3">
             <Label>If You Don't Succeed *</Label>
@@ -235,9 +242,9 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
             <Button
               type="submit"
               className="flex-1 gradient-primary shadow-glow"
-              disabled={creating}
+              disabled={creating || !publicKey}
             >
-              {creating ? 'Creating...' : `Lock & Create Goal`}
+              {creating ? 'Creating on blockchain...' : `Lock ${formData.amountSol} SOL & Create Goal`}
             </Button>
           </div>
         </form>

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { Goal } from '@/types/goal';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,8 +17,10 @@ interface GoalCardProps {
 }
 
 export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardProps) => {
+  const { publicKey, wallet } = useWallet();
   const { toast } = useToast();
   const [claiming, setClaiming] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!goal) {
     return (
@@ -38,23 +41,73 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
   const totalDays = Math.ceil((deadline.getTime() - new Date(goal.createdAt).getTime()) / (1000 * 60 * 60 * 24));
   const progress = Math.max(0, Math.min(100, ((totalDays - daysLeft) / totalDays) * 100));
 
-  const yesVotes = goal.votes.filter(v => v.vote === 'yes').length;
-  const isVerified = goal.status === 'verified' || yesVotes >= goal.requiredVotes;
-  const canClaim = isVerified && goal.status !== 'claimed';
+  const isVerified = goal.status === 'verified' || (goal.yesVotes >= 2 && goal.finalized);
+  const canClaim = isVerified && goal.status !== 'claimed' && goal.status !== 'failed';
+  const canSubmit = goal.status === 'active';
+
+  const handleSubmitForVerification = async () => {
+    if (!wallet || !publicKey) {
+      toast({
+        title: 'Wallet not connected',
+        description: 'Please connect your wallet',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      console.log('📤 Submitting for verification...', goal.user);
+      
+      await mockApi.requestVerification(goal.id, goal.user, wallet);
+      
+      toast({
+        title: 'Submitted for verification! ✨',
+        description: 'Verifiers can now vote on your goal',
+      });
+      
+      onRefresh();
+    } catch (error: any) {
+      console.error('❌ Submit failed:', error);
+      toast({
+        title: 'Submission failed',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleClaim = async () => {
+    if (!wallet || !publicKey) {
+      toast({
+        title: 'Wallet not connected',
+        description: 'Please connect your wallet',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setClaiming(true);
-      await mockApi.claimFunds(goal.id);
+      console.log('💰 Claiming funds...', goal.user);
+      
+      const result = await mockApi.claimFunds(goal.id, goal.user, wallet);
+      
       toast({
-        title: 'Success! 🎉',
-        description: `Claimed ${goal.amountSol} SOL successfully!`,
+        title: result.success ? 'Success! 🎉' : 'Goal Failed 😢',
+        description: result.success 
+          ? `Claimed ${goal.amountSol} SOL successfully!`
+          : `Funds sent to ${goal.failAction === 'burn' ? 'burn wallet' : 'company wallet'}`,
       });
+      
       onRefresh();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Claim failed:', error);
       toast({
         title: 'Error',
-        description: 'Failed to claim funds',
+        description: error.message || 'Failed to claim funds',
         variant: 'destructive',
       });
     } finally {
@@ -63,12 +116,13 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
   };
 
   const statusColor = {
-    pending: 'bg-muted',
-    active: 'bg-accent',
-    verified: 'bg-success',
-    claimed: 'bg-primary',
-    failed: 'bg-destructive',
-  }[goal.status];
+    pending: 'bg-yellow-500/20 text-yellow-500',
+    active: 'bg-blue-500/20 text-blue-500',
+    submitted: 'bg-purple-500/20 text-purple-500',
+    verified: 'bg-green-500/20 text-green-500',
+    claimed: 'bg-primary/20 text-primary',
+    failed: 'bg-red-500/20 text-red-500',
+  }[goal.status] || 'bg-muted';
 
   return (
     <Card className="p-8 shadow-card border-border">
@@ -81,19 +135,11 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
                 {goal.status.toUpperCase()}
               </Badge>
               <Badge variant="outline">
-                {goal.verificationType === 'friend' ? '👤 Friend' : '🌍 Strangers'}
+                {goal.amountSol} SOL Locked
               </Badge>
             </div>
             <h2 className="text-3xl font-bold mb-2">{goal.title}</h2>
             <p className="text-muted-foreground">{goal.description}</p>
-          </div>
-        </div>
-
-        {/* Amount Locked */}
-        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Locked Amount</span>
-            <span className="text-2xl font-bold text-primary">{goal.amountSol} SOL</span>
           </div>
         </div>
 
@@ -110,47 +156,43 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
           </div>
           <Progress value={progress} className="h-2" />
           <div className="text-xs text-muted-foreground text-right">
-            {deadline.toLocaleDateString()}
+            Deadline: {deadline.toLocaleDateString()}
           </div>
         </div>
 
         {/* Verification Progress */}
-        {goal.status === 'active' && (
+        {(goal.status === 'submitted' || goal.yesVotes > 0) && (
           <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold">Verification Progress</span>
               <span className="text-sm font-bold text-accent">
-                {yesVotes} / {goal.requiredVotes} votes
+                {goal.yesVotes} / 2 YES votes
               </span>
             </div>
-            <Progress value={(yesVotes / goal.requiredVotes) * 100} className="h-2" />
-            <div className="mt-3 space-y-1">
-              {goal.votes.map((vote, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-xs">
-                  {vote.vote === 'yes' ? (
-                    <CheckCircle2 className="w-3 h-3 text-success" />
-                  ) : (
-                    <AlertCircle className="w-3 h-3 text-destructive" />
-                  )}
-                  <span className="text-muted-foreground">{vote.wallet}</span>
-                  <span className={vote.vote === 'yes' ? 'text-success' : 'text-destructive'}>
-                    {vote.vote === 'yes' ? 'Approved' : 'Rejected'}
-                  </span>
-                </div>
-              ))}
+            <Progress value={(goal.yesVotes / 2) * 100} className="h-2" />
+            
+            <div className="mt-3 text-xs text-muted-foreground">
+              <p>✅ YES votes: {goal.yesVotes}</p>
+              <p>❌ NO votes: {goal.noVotes}</p>
+              {goal.finalized && (
+                <p className="font-semibold text-accent mt-2">
+                  {isVerified ? '✅ Verification complete!' : '❌ Verification failed'}
+                </p>
+              )}
             </div>
           </div>
         )}
 
         {/* Actions */}
         <div className="flex gap-3">
-          {goal.status === 'pending' && (
+          {canSubmit && (
             <Button
-              onClick={() => onVerificationRequest(goal)}
+              onClick={handleSubmitForVerification}
+              disabled={submitting}
               className="flex-1 gradient-primary shadow-glow"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              Request Verification
+              {submitting ? 'Submitting...' : 'Submit for Verification'}
             </Button>
           )}
           
@@ -161,7 +203,7 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
               className="flex-1 bg-success hover:bg-success/90"
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
-              {claiming ? 'Claiming...' : 'Claim Funds'}
+              {claiming ? 'Processing...' : 'Claim Funds'}
             </Button>
           )}
 
@@ -171,11 +213,18 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
               <p className="text-sm font-semibold text-success">Claimed Successfully!</p>
             </div>
           )}
+
+          {goal.status === 'failed' && (
+            <div className="flex-1 bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-center">
+              <AlertCircle className="w-6 h-6 text-destructive mx-auto mb-2" />
+              <p className="text-sm font-semibold text-destructive">Goal Failed</p>
+            </div>
+          )}
         </div>
 
         {/* Fail Destination Info */}
         <div className="text-xs text-muted-foreground text-center pt-2 border-t border-border">
-          If failed, funds will be sent to: <span className="font-semibold">{goal.failDestination === 'burn' ? '🔥 Burn Wallet' : '🏢 Company Wallet'}</span>
+          If failed, funds will be sent to: <span className="font-semibold">{goal.failAction === 'burn' ? '🔥 Burn Wallet' : '🏢 Company Wallet'}</span>
         </div>
       </div>
     </Card>
