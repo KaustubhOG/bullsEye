@@ -1,4 +1,9 @@
 app
+ ┣ api
+ ┃ ┗ actions
+ ┃ ┃ ┗ vote
+ ┃ ┃ ┃ ┗ [goalOwner]
+ ┃ ┃ ┃ ┃ ┗ route.ts
  ┣ dashboard
  ┃ ┗ page.tsx
  ┣ WalletProviders.tsx
@@ -79,7 +84,8 @@ app
  ┣ utils.ts
  ┗ wallet.tsx
  node_modules
- public
+public
+ ┣ actions.json
  ┣ file.svg
  ┣ globe.svg
  ┣ next.svg

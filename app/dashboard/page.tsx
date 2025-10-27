@@ -11,7 +11,6 @@ import { DemoControls } from "@/components/DemoControls";
 import { Goal, FeedItem } from "@/types/goal";
 import { mockApi } from "@/lib/mockApi";
 
-
 export default function DashboardPage() {
   const { publicKey, connected } = useWallet();
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -69,20 +68,11 @@ export default function DashboardPage() {
     setCreateModalOpen(true);
   };
 
-  const handleVerificationRequest = async (goal: Goal) => {
-    try {
-      const result = await mockApi.requestVerification(
-        goal.id,
-        goal.user,
-        (window as any).solana // Pass the wallet adapter
-      );
-      const updatedGoal = { ...goal, blinkLinks: result.blinkLinks, status: 'active' as const };
-      setSelectedGoal(updatedGoal);
-      setVerificationModalOpen(true);
-      loadData();
-    } catch (error) {
-      console.error('Failed to request verification:', error);
-    }
+  // This function just opens the modal - GoalCard already submitted the goal
+  const handleVerificationRequest = (goal: Goal) => {
+    console.log('📨 Opening verification modal for goal:', goal.id);
+    setSelectedGoal(goal);
+    setVerificationModalOpen(true);
   };
 
   const totalSolLocked = goals
@@ -120,7 +110,7 @@ export default function DashboardPage() {
             
             {connected && (
               <DemoControls
-                activeGoalId={activeGoal?.id || null}
+                activeGoalId={activeGoal?.user || null}
                 onVoteSuccess={loadData}
               />
             )}

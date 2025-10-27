@@ -74,7 +74,11 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
         description: 'Verifiers can now vote on your goal',
       });
       
-      onRefresh();
+      // Refresh to get updated goal data
+      await onRefresh();
+      
+      // Open verification modal with Blink links
+      onVerificationRequest(goal);
     } catch (error: any) {
       console.error('❌ Submit failed:', error);
       toast({
