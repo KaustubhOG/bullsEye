@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { BullseyeClient } from '@/lib/solana/bullseye-client';
 import { getRpcEndpoint, NETWORK, VERIFIERS, PROGRAM_ID } from '@/lib/solana/config';
-import { deriveGoalPda, deriveVerificationPda } from '@/lib/solana/utils';
+import { deriveGoalPda, deriveVerificationPda, deriveGoalCounterPda } from '@/lib/solana/utils';
 import * as anchor from '@coral-xyz/anchor';
 import IDL from '@/lib/solana/idl/bullseye.json';
 
@@ -14,8 +14,7 @@ const ACTIONS_CORS_HEADERS = {
   'Content-Type': 'application/json',
   'X-Action-Version': '2.0',
   'X-Blockchain-Ids': 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
-    'ngrok-skip-browser-warning': 'true',  // ✅ Add this line
-
+  'ngrok-skip-browser-warning': 'true',
 };
 
 // Get base URL from environment or request
@@ -40,10 +39,10 @@ export async function OPTIONS(req: NextRequest) {
 // GET - Returns the Blink metadata
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ goalOwner: string }> } // ✅ FIXED: Next.js 15 async params
+  context: { params: Promise<{ goalOwner: string }> }
 ) {
   try {
-    const { goalOwner } = await context.params; // ✅ FIXED: Await params
+    const { goalOwner } = await context.params;
     
     console.log('🔍 Blink GET request for:', goalOwner);
     
@@ -64,7 +63,7 @@ export async function GET(
     // Build response
     const response = {
       icon: `${baseUrl}/preview.png`,  
-      image: `${baseUrl}/preview.png`, // ✅ ADD THIS LINE
+      image: `${baseUrl}/preview.png`,
       title: `Vote on Goal`,
       description: goalData 
         ? `Vote YES or NO on this goal.\n\n📝 ${goalData.title}\n💰 Stake: ${goalData.amountSol.toFixed(2)} SOL\n\nGoal Owner: ${goalOwner.slice(0, 8)}...`
@@ -103,10 +102,10 @@ export async function GET(
 // POST - Handles the vote transaction building
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ goalOwner: string }> } // ✅ FIXED: Next.js 15 async params
+  context: { params: Promise<{ goalOwner: string }> }
 ) {
   try {
-    const { goalOwner } = await context.params; // ✅ FIXED: Await params
+    const { goalOwner } = await context.params;
     const { searchParams } = new URL(req.url);
     const vote = searchParams.get('vote');
     
@@ -138,12 +137,29 @@ export async function POST(
     const verifierPubkey = new PublicKey(account);
     const goalOwnerPubkey = new PublicKey(goalOwner);
     
-    // ✅ FIXED: Use deriveGoalPda from utils (not client method)
-    const [goalPda] = deriveGoalPda(goalOwnerPubkey);
+    // ✅ UPDATED: Get goal counter to find active goal number
+    const client = new BullseyeClient();
+    const goalCounter = await client.getGoalCounter(goalOwnerPubkey);
+    
+    if (!goalCounter || goalCounter.activeGoal === null) {
+      return NextResponse.json(
+        { error: 'No active goal found for this user' },
+        { 
+          status: 400,
+          headers: ACTIONS_CORS_HEADERS 
+        }
+      );
+    }
+    
+    const goalNumber = goalCounter.activeGoal;
+    
+    // ✅ UPDATED: Use goal number in PDA derivation
+    const [goalPda] = deriveGoalPda(goalOwnerPubkey, goalNumber);
     const [verificationPda] = deriveVerificationPda(goalPda);
     
     console.log('📍 Goal PDA:', goalPda.toBase58());
     console.log('📍 Verification PDA:', verificationPda.toBase58());
+    console.log('📍 Goal Number:', goalNumber);
     
     // ✅ FIXED: Build transaction directly using Anchor
     const provider = new anchor.AnchorProvider(
