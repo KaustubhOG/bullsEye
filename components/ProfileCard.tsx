@@ -88,16 +88,16 @@ export const ProfileCard = ({
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats - NOW IN RED */}
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
           <div className="text-center">
-            <p className="text-2xl font-bold gradient-primary bg-clip-text text-transparent">
+            <p className="text-2xl font-bold text-red-500">
               {totalGoals}
             </p>
             <p className="text-xs text-muted-foreground">Active Goals</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold gradient-primary bg-clip-text text-transparent">
+            <p className="text-2xl font-bold text-red-500">
               {totalSolLocked.toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground">SOL Locked</p>
