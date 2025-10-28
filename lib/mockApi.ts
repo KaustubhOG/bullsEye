@@ -56,8 +56,17 @@ export const mockApi = {
       });
       
       return goal;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error creating goal:', error);
+      
+      // Re-throw with better error message
+      if (error.message.includes('already been processed')) {
+        throw new Error('Transaction already processed. Please check your wallet.');
+      } else if (error.message.includes('insufficient funds')) {
+        throw new Error('Insufficient SOL balance. Please fund your wallet.');
+      } else if (error.message.includes('ActiveGoalExists')) {
+        throw new Error('You already have an active goal. Complete it before creating a new one.');
+      }
       throw error;
     }
   },
@@ -100,6 +109,46 @@ export const mockApi = {
     } catch (error) {
       console.error('❌ Error fetching goal:', error);
       return null;
+    }
+  },
+
+  /**
+   * NEW: Check if user has goal counter initialized
+   */
+  async hasGoalCounter(userWallet: string): Promise<boolean> {
+    try {
+      const { PublicKey } = await import('@solana/web3.js');
+      const pubkey = new PublicKey(userWallet);
+      return client.hasGoalCounter(pubkey);
+    } catch (error) {
+      console.error('❌ Error checking goal counter:', error);
+      return false;
+    }
+  },
+
+  /**
+   * NEW: Check if user has active goal
+   */
+  async hasActiveGoal(userWallet: string): Promise<boolean> {
+    try {
+      const { PublicKey } = await import('@solana/web3.js');
+      const pubkey = new PublicKey(userWallet);
+      return client.hasActiveGoal(pubkey);
+    } catch (error) {
+      console.error('❌ Error checking active goal:', error);
+      return false;
+    }
+  },
+
+  /**
+   * NEW: Initialize goal counter for user
+   */
+  async initializeGoalCounter(wallet: any): Promise<string> {
+    try {
+      return await client.initializeGoalCounter(wallet);
+    } catch (error) {
+      console.error('❌ Error initializing goal counter:', error);
+      throw error;
     }
   },
 
@@ -278,4 +327,4 @@ export const mockApi = {
       return false;
     }
   }
-};
+};  

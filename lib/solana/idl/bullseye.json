@@ -40,6 +40,11 @@
                 "kind": "account",
                 "path": "goal.user",
                 "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
               }
             ]
           }
@@ -119,6 +124,11 @@
                 "kind": "account",
                 "path": "goal.user",
                 "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
               }
             ]
           }
@@ -147,6 +157,36 @@
               {
                 "kind": "account",
                 "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
               }
             ]
           }
@@ -200,6 +240,11 @@
                 "kind": "account",
                 "path": "goal.user",
                 "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
               }
             ]
           }
@@ -237,6 +282,63 @@
       "args": []
     },
     {
+      "name": "initialize_counter",
+      "docs": [
+        "Initialize the goal counter for a user (one-time setup)"
+      ],
+      "discriminator": [
+        67,
+        89,
+        100,
+        87,
+        231,
+        172,
+        35,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_goal",
       "docs": [
         "Initialize a new goal with locked SOL"
@@ -269,6 +371,11 @@
               {
                 "kind": "account",
                 "path": "user"
+              },
+              {
+                "kind": "account",
+                "path": "goal_counter.count",
+                "account": "GoalCounter"
               }
             ]
           }
@@ -298,6 +405,35 @@
               {
                 "kind": "account",
                 "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
               }
             ]
           }
@@ -382,6 +518,11 @@
                 "kind": "account",
                 "path": "goal.user",
                 "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
               }
             ]
           }
@@ -435,6 +576,19 @@
         131,
         207,
         26
+      ]
+    },
+    {
+      "name": "GoalCounter",
+      "discriminator": [
+        155,
+        23,
+        242,
+        215,
+        64,
+        160,
+        160,
+        184
       ]
     },
     {
@@ -609,6 +763,11 @@
       "code": 6012,
       "name": "NoVerificationResult",
       "msg": "No verification result available"
+    },
+    {
+      "code": 6013,
+      "name": "ActiveGoalExists",
+      "msg": "User already has an active goal. Complete it before creating a new one."
     }
   ],
   "types": [
@@ -732,6 +891,36 @@
             "type": "i64"
           },
           {
+            "name": "goal_number",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoalCounter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "active_goal",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
             "name": "bump",
             "type": "u8"
           }
@@ -758,6 +947,10 @@
           {
             "name": "deadline",
             "type": "i64"
+          },
+          {
+            "name": "goal_number",
+            "type": "u64"
           }
         ]
       }

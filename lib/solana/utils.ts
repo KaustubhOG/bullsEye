@@ -15,13 +15,26 @@ import type {
 // ============================================================================
 
 /**
- * Derive Goal PDA for a user
+ * Derive Goal Counter PDA for a user
  * @param userPublicKey - User's wallet public key
  * @returns [PDA PublicKey, bump seed]
  */
-export function deriveGoalPda(userPublicKey: PublicKey): [PublicKey, number] {
+export function deriveGoalCounterPda(userPublicKey: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(SEEDS.GOAL), userPublicKey.toBuffer()],
+    [Buffer.from("goal_counter"), userPublicKey.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+/**
+ * Derive Goal PDA for a user
+ * @param userPublicKey - User's wallet public key
+ * @param goalNumber - Goal number from goal counter
+ * @returns [PDA PublicKey, bump seed]
+ */
+export function deriveGoalPda(userPublicKey: PublicKey, goalNumber: number = 0): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(SEEDS.GOAL), userPublicKey.toBuffer(), Buffer.from(new anchor.BN(goalNumber).toArray("le", 8))],
     PROGRAM_ID
   );
 }
@@ -240,6 +253,7 @@ export function parseAnchorError(error: any): string {
     'VerificationNotComplete': 'Verification period has not ended yet',
     'VerificationNotFinalized': 'Verification must be finalized before claiming',
     'NoVerificationResult': 'No verification result available',
+    'ActiveGoalExists': 'You already have an active goal. Complete it before creating a new one.',
     'insufficient funds': 'Insufficient SOL balance',
     'User rejected': 'Transaction was rejected',
   };

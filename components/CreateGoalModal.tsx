@@ -53,6 +53,32 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
       return;
     }
 
+    // Prevent double submission
+    if (creating) {
+      toast({
+        title: 'Transaction in progress',
+        description: 'Please wait for the current transaction to complete',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // NEW: Check if user has active goal
+    try {
+      const hasActiveGoal = await mockApi.hasActiveGoal(publicKey.toString());
+      if (hasActiveGoal) {
+        toast({
+          title: 'Active Goal Exists',
+          description: 'You already have an active goal. Complete it before creating a new one.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } catch (error) {
+      console.log('ℹ️ Error checking active goal (may be new user):', error);
+      // Continue with creation - error might mean no goal counter exists yet
+    }
+
     // Validate amount
     if (formData.amountSol < 0.1) {
       toast({
@@ -85,6 +111,15 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
         signAllTransactions,
       };
       
+      // NEW: Initialize goal counter if needed (handled automatically in client)
+      const hasCounter = await mockApi.hasGoalCounter(publicKey.toString());
+      if (!hasCounter) {
+        console.log('🆕 Initializing goal counter for new user...');
+        await mockApi.initializeGoalCounter(walletAdapter);
+        // Small delay after counter initialization
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       // Call API with proper wallet adapter
       await mockApi.createGoal(
         { ...formData, deadline: deadlineISO },
@@ -112,9 +147,23 @@ export const CreateGoalModal = ({ open, onOpenChange, onSuccess }: CreateGoalMod
       });
     } catch (error: any) {
       console.error('❌ Error creating goal:', error);
+      
+      // Handle specific error cases
+      let errorMessage = error.message || 'Please try again';
+      
+      if (errorMessage.includes('already been processed')) {
+        errorMessage = 'Transaction was already processed. Please check your wallet for confirmation.';
+      } else if (errorMessage.includes('insufficient funds')) {
+        errorMessage = 'Insufficient SOL balance. Please fund your wallet and try again.';
+      } else if (errorMessage.includes('User rejected')) {
+        errorMessage = 'Transaction was cancelled. Please try again.';
+      } else if (errorMessage.includes('ActiveGoalExists')) {
+        errorMessage = 'You already have an active goal. Complete it before creating a new one.';
+      }
+      
       toast({
         title: 'Failed to create goal',
-        description: error.message || 'Please try again',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

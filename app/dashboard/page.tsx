@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [activeGoal, setActiveGoal] = useState<Goal | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasActiveGoal, setHasActiveGoal] = useState(false);
 
   const loadData = async () => {
     try {
@@ -40,14 +41,20 @@ export default function DashboardPage() {
           // Set active goal (first non-claimed goal)
           const active = goalsData.find(g => g.status !== 'claimed' && g.status !== 'failed') || null;
           setActiveGoal(active);
+          
+          // Check if user has active goal
+          const hasActive = await mockApi.hasActiveGoal(publicKey.toString());
+          setHasActiveGoal(hasActive);
         } catch (error: any) {
           console.log('ℹ️ No goals found for this wallet (this is normal for new users)');
           setGoals([]);
           setActiveGoal(null);
+          setHasActiveGoal(false);
         }
       } else {
         setGoals([]);
         setActiveGoal(null);
+        setHasActiveGoal(false);
       }
     } catch (error) {
       console.error('❌ Error loading data:', error);
@@ -65,6 +72,12 @@ export default function DashboardPage() {
       console.log('⚠️ Wallet not connected');
       return;
     }
+    
+    if (hasActiveGoal) {
+      console.log('⚠️ User already has active goal');
+      return;
+    }
+    
     setCreateModalOpen(true);
   };
 
@@ -93,6 +106,11 @@ export default function DashboardPage() {
           {!connected && (
             <p className="text-sm text-yellow-500 mt-2">
               ⚠️ Please connect your wallet to create goals
+            </p>
+          )}
+          {connected && hasActiveGoal && (
+            <p className="text-sm text-blue-500 mt-2">
+              ℹ️ Complete your current goal to create a new one
             </p>
           )}
         </header>

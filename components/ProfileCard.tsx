@@ -5,6 +5,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
+import { mockApi } from '@/lib/mockApi';
 
 interface ProfileCardProps {
   totalGoals: number;
@@ -21,10 +22,27 @@ export const ProfileCard = ({
 }: ProfileCardProps) => {
   const wallet = useWallet(); // ✅ Get full wallet object
   const [mounted, setMounted] = useState(false);
+  const [hasActiveGoal, setHasActiveGoal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const checkActiveGoal = async () => {
+      if (wallet.publicKey) {
+        try {
+          const active = await mockApi.hasActiveGoal(wallet.publicKey.toString());
+          setHasActiveGoal(active);
+        } catch (error) {
+          console.log('Error checking active goal:', error);
+          setHasActiveGoal(false);
+        }
+      }
+    };
+
+    checkActiveGoal();
+  }, [wallet.publicKey, totalGoals]);
 
   // ✅ Show loading state until mounted
   if (!mounted) {
@@ -86,14 +104,29 @@ export const ProfileCard = ({
           </div>
         </div>
 
+        {/* Active Goal Status */}
+        {connected && (
+          <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <p className="text-sm font-semibold">
+              {hasActiveGoal ? '🎯 Active Goal' : '✅ Ready for New Goal'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {hasActiveGoal 
+                ? 'Complete current goal to create new one' 
+                : 'You can create a new goal now'
+              }
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="space-y-3 pt-4 border-t border-border">
           <Button
             onClick={onCreateGoal}
             className="w-full gradient-primary shadow-glow"
-            disabled={!connected}
+            disabled={!connected || hasActiveGoal}
           >
-            + Create Goal
+            {hasActiveGoal ? 'Complete Current Goal First' : '+ Create Goal'}
           </Button>
           <Button
             variant="outline"

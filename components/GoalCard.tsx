@@ -30,6 +30,9 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
           <div className="text-6xl mb-4">🎯</div>
           <h3 className="text-xl font-semibold mb-2">No Active Goal</h3>
           <p className="text-muted-foreground">Create a goal to get started!</p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Complete your current goal to create a new one
+          </p>
         </div>
       </Card>
     );
@@ -230,6 +233,9 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
             <div className="flex-1 bg-success/10 border border-success/20 rounded-lg p-4 text-center">
               <CheckCircle2 className="w-6 h-6 text-success mx-auto mb-2" />
               <p className="text-sm font-semibold text-success">Claimed Successfully!</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                You can now create a new goal
+              </p>
             </div>
           )}
 
@@ -237,6 +243,9 @@ export const GoalCard = ({ goal, onVerificationRequest, onRefresh }: GoalCardPro
             <div className="flex-1 bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-center">
               <AlertCircle className="w-6 h-6 text-destructive mx-auto mb-2" />
               <p className="text-sm font-semibold text-destructive">Goal Failed</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                You can now create a new goal
+              </p>
             </div>
           )}
         </div>
