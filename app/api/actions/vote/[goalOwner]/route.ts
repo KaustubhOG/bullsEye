@@ -19,13 +19,8 @@ const ACTIONS_CORS_HEADERS = {
 
 // Get base URL from environment or request
 function getBaseUrl(req: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
-  }
-  
-  const host = req.headers.get('host');
-  const protocol = req.headers.get('x-forwarded-proto') || 'https';
-  return `${protocol}://${host}`;
+  // Use environment variable if available, otherwise use request host
+  return process.env.NEXT_PUBLIC_APP_URL || `https://${req.headers.get('host')}`;
 }
 
 // OPTIONS - CORS preflight
